@@ -10,6 +10,7 @@
 #import "RequestHelper.h"
 #import "ListViewController.h"
 #import "WXApi.h"
+#import "MobClick.h"
 
 @implementation AppDelegate
 
@@ -25,6 +26,7 @@
     self.window.rootViewController = _navigationController;
     [self.window makeKeyAndVisible];
     [WXApi registerApp:@"wxb3b0db608a4925ee"];
+    [MobClick startWithAppkey:@"51c02df056240b165f006d11"];
     return YES;
 }
 

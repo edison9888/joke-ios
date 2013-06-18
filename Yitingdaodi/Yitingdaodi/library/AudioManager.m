@@ -87,7 +87,9 @@ static AudioManager *sSharedInstance;
         [[NSNotificationCenter defaultCenter] postNotificationName:AudioProgressNotification object:[NSNumber numberWithFloat:1]];
         tempURL = nil;
         [self stopTick];
-        [self next];
+        if ([[[UserDataManager defaultUserData] valueForKey:@"autoPlay"] boolValue]) {
+            [self next];
+        }
     }
     int reason = [[[notification userInfo] valueForKey:MPMoviePlayerPlaybackDidFinishReasonUserInfoKey] intValue];
     if (reason == MPMovieFinishReasonPlaybackEnded) {

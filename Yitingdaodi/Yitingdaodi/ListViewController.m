@@ -151,7 +151,6 @@
         if (cell==nil) {
             NSArray *nib = [[NSBundle mainBundle] loadNibNamed:@"Cell" owner:self options:nil];
             cell = [nib objectAtIndex:0];
-            NSLog(@"init cell%@", indexPath);
             cell.tag = (indexPath.section+1)*indexPath.row;
             NSDictionary *info = [[datas objectAtIndex:indexPath.section] objectAtIndex:indexPath.row+1];
             [cell.likeBtn setTitle:[NSString stringWithFormat:@"  %@", [info valueForKey:@"likes"]] forState:UIControlStateNormal];

@@ -11,6 +11,8 @@
 #import "AudioManager.h"
 #import "PlayingView.h"
 #import <QuartzCore/QuartzCore.h>
+#import "MobClick.h"
+
 @implementation Cell {
     PlayingView *playView;
     NSString *url;
@@ -80,6 +82,7 @@
 }
 
 - (IBAction)controlAudio:(id)sender {
+    [MobClick event:@"clickImgToPlay"];
     if (playView==nil) {
         [self playAudio:nil];
     } else {

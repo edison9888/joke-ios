@@ -9,6 +9,7 @@
 #import "ConfigViewController.h"
 #import <QuartzCore/QuartzCore.h>
 #import "RecordViewController.h"
+#import "UserDataManager.h"
 @interface ConfigViewController ()
 
 @end
@@ -49,6 +50,7 @@
     [super viewDidLoad];
 //    NSString *path = [NSHomeDirectory() stringByAppendingPathComponent:@"Documents"];
     dataSource = [[NSMutableArray alloc] init];
+    [dataSource addObject:@[@"自动连播"]];
     [dataSource addObject:@[[NSString stringWithFormat:@"清除缓存 (已使用%@)", [self sizeOfFolder:NSTemporaryDirectory()]]]];
     [dataSource addObject:@[@"离线听 (下载最新20条)"]];
     [dataSource addObject:@[@"意见反馈", @"联系我们"]];
@@ -117,16 +119,26 @@
                 cell.backgroundView = [[UIImageView alloc] initWithImage:[imageNamed(@"cell_center.png") resizableImageWithCapInsets:UIEdgeInsetsMake(10, 10, 10, 10)]];
             }
         }
-        if (indexPath.section==2) {
+        if (indexPath.section==3) {
             cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
         }
-        cell.textLabel.text = [[dataSource objectAtIndex:indexPath.section] objectAtIndex:indexPath.row];
-//        if (indexPath.section==1) {
-//            cell.detailTextLabel.text = @"99%";
-//        }
+    }
+    cell.textLabel.text = [[dataSource objectAtIndex:indexPath.section] objectAtIndex:indexPath.row];
+    
+    if (indexPath.section==0) {
+        UISwitch *swi = [[UISwitch alloc] init];
+        [swi addTarget:self action:@selector(changePlayList:) forControlEvents:UIControlEventValueChanged];
+        [swi setOn:[[[UserDataManager defaultUserData] valueForKey:@"autoPlay"] boolValue]];
+        swi.center = CGPointMake(340-swi.frame.size.width, 55/2);
+        [cell addSubview:swi];
     }
 
     return cell;
+}
+
+- (void)changePlayList:(UISwitch *)swi{
+    [[UserDataManager defaultUserData] setValue:@(swi.on) forKey:@"autoPlay"];
+    [UserDataManager synchronizeUserData];
 }
 
 - (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath{
@@ -177,7 +189,7 @@
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath
 {
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
-    if (indexPath.section==0) {
+    if (indexPath.section==1) {
         NSLog(@"%@", NSTemporaryDirectory());
         NSArray *contents = [[NSFileManager defaultManager] contentsOfDirectoryAtPath:NSTemporaryDirectory() error:nil];
         NSEnumerator *contentsEnumurator = [contents objectEnumerator];
@@ -187,10 +199,10 @@
             [[NSFileManager defaultManager] removeItemAtPath:[NSTemporaryDirectory() stringByAppendingPathComponent:file] error:nil];
         }
         
-        [dataSource replaceObjectAtIndex:0 withObject:@[[NSString stringWithFormat:@"清除缓存 (已使用%@)", [self sizeOfFolder:NSTemporaryDirectory()]]]];
+        [dataSource replaceObjectAtIndex:1 withObject:@[@"清除缓存 (已使用Zero KB)"]];
         [self.tableView reloadData];
     }
-    if (indexPath.section==2&&indexPath.row==0) {
+    if (indexPath.section==3&&indexPath.row==0) {
         RecordViewController *record = [[RecordViewController alloc] initWithFeedBack];
         [self.navigationController pushViewController:record animated:YES];
     }
