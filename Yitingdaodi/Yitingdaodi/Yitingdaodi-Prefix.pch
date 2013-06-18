@@ -1,0 +1,29 @@
+//
+//  Prefix header
+//
+//  The contents of this file are implicitly included at the beginning of every source file.
+//
+
+#import <Availability.h>
+
+#ifndef __IPHONE_5_0
+#warning "This project uses features only available in iOS SDK 5.0 and later."
+#endif
+
+#ifdef __OBJC__
+#import <UIKit/UIKit.h>
+#import <Foundation/Foundation.h>
+#import <SystemConfiguration/SystemConfiguration.h>
+#import <MobileCoreServices/MobileCoreServices.h>
+#import "AdditionsMacro.h"
+#import "NavigationController.h"
+#import "NavigationBar.h"
+#import "AppUtil.h"
+#import "UserDataManager.h"
+#import "AppDelegate.h"
+#endif
+
+#define ApplicationDelegate ((AppDelegate *)[UIApplication sharedApplication].delegate)//获取AppDelegate
+#define navi ([(AppDelegate *)[UIApplication sharedApplication].delegate navigationController])//获取AppDelegate
+#define naviBar ([(AppDelegate *)[UIApplication sharedApplication].delegate navigationController].bar)
+#define OtherCellPlayNotification @"OtherPlay"
