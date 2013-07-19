@@ -12,7 +12,7 @@
 #import "AFHTTPRequestOperation.h"
 #import "JSONKit.h"
 #import "AppUtil.h"
-#define SERVER_URL @"http://t.pamakids.com/"
+#define SERVER_URL @"http://42.96.164.29:8888/"
 
 @implementation RequestHelper 
 
@@ -26,6 +26,9 @@
 }
 
 - (void)requestAPI:(NSString *)api type:(NSString *)type postData:(NSDictionary *)datas success:(void (^)(id result))success failed:(void (^)(id result, NSError *error))failed{
+    if (![RequestHelper checkNetWork]) {
+        return;
+    }
     NSURL *url = [NSURL URLWithString:SERVER_URL];
     AFHTTPClient *httpClient = [[AFHTTPClient alloc] initWithBaseURL:url];
     
@@ -54,6 +57,14 @@
 
 - (void)requestDELETEAPI:(NSString *)api postData:(NSDictionary *)datas success:(void (^)(id result))success failed:(void (^)(id result, NSError *error))failed{
     [self requestAPI:api type:@"DELETE" postData:datas success:success failed:failed];
+}
+
++ (BOOL)checkNetWork{
+    BOOL isNetWorking = [UIDevice isNetworkReachable];
+    if (!isNetWorking) {
+        [AppUtil warning:@"请检查网络连接" withType:m_error];
+    }
+    return isNetWorking;
 }
 
 @end

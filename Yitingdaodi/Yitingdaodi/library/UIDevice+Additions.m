@@ -13,8 +13,13 @@
 
 @implementation UIDevice (Additions)
 
+
++ (BOOL)isRetina{
+    return [UIScreen mainScreen].scale==2;
+}
+
 + (BOOL)isNewiPad{
-    return ([self isiPad] && [UIScreen mainScreen].scale==2);
+    return ([self isiPad] && [self isRetina]);
 }
 
 + (BOOL)isiPhone5{

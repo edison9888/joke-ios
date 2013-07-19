@@ -7,8 +7,9 @@
 //
 
 #import <UIKit/UIKit.h>
+#import <AVFoundation/AVFoundation.h>
 
-@interface RecordViewController : UIViewController <UINavigationControllerDelegate, UIImagePickerControllerDelegate>
+@interface RecordViewController : UIViewController <UINavigationControllerDelegate, UIImagePickerControllerDelegate, UIActionSheetDelegate, AVAudioPlayerDelegate>
 
 - (id)initWithFeedBack;
 

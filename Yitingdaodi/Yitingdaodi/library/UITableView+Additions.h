@@ -11,5 +11,6 @@
 @interface UITableView (Additions)
 
 - (void)reloadData:(BOOL)animated;
+- (void)reloadDataWithCompletion:(void(^)(void))completionBlock;
 
 @end

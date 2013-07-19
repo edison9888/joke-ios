@@ -10,6 +10,7 @@
 
 @interface UIDevice (Additions)
 
++ (BOOL)isRetina;
 + (BOOL)isNewiPad;
 + (BOOL)isiPhone5;
 + (BOOL)isiPad;

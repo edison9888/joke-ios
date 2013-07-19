@@ -66,8 +66,12 @@
 }
 
 - (void)popView{
-    [navi popViewControllerAnimated:YES];
-    [self pop];
+    if ([navi.visibleViewController respondsToSelector:@selector(pop)]) {
+        [navi.visibleViewController performSelector:@selector(pop)];
+    } else {
+        [navi popViewControllerAnimated:YES];
+        [self pop];
+    }
 }
 
 - (void)push{

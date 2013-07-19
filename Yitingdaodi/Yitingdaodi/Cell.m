@@ -9,12 +9,10 @@
 #import "Cell.h"
 #import "UIImageView+AFNetworking.h"
 #import "AudioManager.h"
-#import "PlayingView.h"
 #import <QuartzCore/QuartzCore.h>
 #import "MobClick.h"
-
+#import "RequestHelper.h"
 @implementation Cell {
-    PlayingView *playView;
     NSString *url;
     int scene;
 }
@@ -23,6 +21,10 @@
     self = [super initWithCoder:aDecoder];
     if (self) {
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(stop:) name:OtherCellPlayNotification object:nil];
+//        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(changePlaying:) name:AudioNextNotification object:nil];
+//        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(changePlaying:) name:AudioPreNotification object:nil];
+        self.powerView.layer.anchorPoint = CGPointMake(.5, .5);
+        self.powerView.boundsWidth = 0;
     }
     return self;
 }
@@ -37,28 +39,35 @@
 - (void)setImageURL:(NSString *)url_{
     if (url!=url_||self.coverImageView.image==nil) {
         url = url_;
+//        NSLog(@"load image:%@", url_);
         [self.coverImageView setImageWithURL:[NSURL URLWithString:url]];
-    }
-    if (playView==nil&&[[AudioManager defaultManager] currentIndex]==self.tag) {
-        [self addPlayingView];
     }
 }
 
 - (IBAction)likeAudio:(id)sender {
     if (self.likeBtn.tag==1) {
-        [AppUtil warning:@"我不喜欢!" withType:m_success];
+//        [AppUtil warning:@"我不喜欢!" withType:m_success];
+        int like = self.likeLabel.text.intValue;
+        like--;
+        self.likeLabel.text = [NSString stringWithFormat:@"%d", like];
         self.likeBtn.selected = YES;
-        self.likeBtn.tag = -1;
+        self.likeBtn.tag = 0;
     } else {
-        [AppUtil warning:@"我喜欢!" withType:m_success];
+        int like = self.likeLabel.text.intValue;
+        like++;
+        self.likeLabel.text = [NSString stringWithFormat:@"%d", like];
+        [AppUtil warning:imageNamed(@"heart.png")];
         self.likeBtn.selected = NO;
         self.likeBtn.tag = 1;
     }
+    [[RequestHelper defaultHelper] requestPOSTAPI:@"/api/likes" postData:@{@"myjoke_id": _id1, @"uid": [UIDevice udid], @"isLike":@(self.likeBtn.tag)} success:^(id result) {
+        NSLog(@"success%@", result);
+    } failed:nil];
 }
 
 - (IBAction)shareAudio:(id)sender {
 //    [AppUtil warning:@"分享成功" withType:m_success];
-    UIActionSheet *acion = [[UIActionSheet alloc] initWithTitle:@"分享给" delegate:self cancelButtonTitle:nil destructiveButtonTitle:@"取消" otherButtonTitles:@"微信好友", @"朋友圈", nil];
+    UIActionSheet *acion = [[UIActionSheet alloc] initWithTitle:@"分享给" delegate:self cancelButtonTitle:@"取消" destructiveButtonTitle:nil otherButtonTitles:@"微信好友", @"朋友圈", nil];
     acion.actionSheetStyle = UIActionSheetStyleBlackTranslucent;
     [acion showInView:self.window];
 }
@@ -66,11 +75,11 @@
 - (void)actionSheet:(UIActionSheet *)actionSheet clickedButtonAtIndex:(NSInteger)buttonIndex{
     if (buttonIndex!=actionSheet.cancelButtonIndex) {
         switch (buttonIndex) {
-            case 1:{//好友
+            case 0:{//好友
                 scene = WXSceneSession;
                 break;
             }
-            case 2:{//朋友圈
+            case 1:{//朋友圈
                 scene = WXSceneTimeline;
                 break;
             }
@@ -83,57 +92,90 @@
 
 - (IBAction)controlAudio:(id)sender {
     [MobClick event:@"clickImgToPlay"];
-    if (playView==nil) {
-        [self playAudio:nil];
-    } else {
+    if ([List currentIndex] && [[AudioManager defaultManager] playing]) {
         [self pauseAudio:nil];
+    } else {
+        [self playAudio:nil];
     }
 }
 
 - (IBAction)pauseAudio:(id)sender {
     [[AudioManager defaultManager] pause];
-    [self removePlayingView];
+//    [self removePlayingView];
+}
+
+- (void)playUI{
+    self.playCount.text = [NSString stringWithFormat:@"%d", self.playCount.text.intValue+1];
+    [[RequestHelper defaultHelper] requestPOSTAPI:@"/api/myjokes/play" postData:@{@"id": _id1, @"uid": [UIDevice udid]} success:^(id result) {
+        NSLog(@"success%@", result);
+    } failed:nil];
+    if ([List hasCacheWithIndex:self.path]) {
+        self.cacheProgress.width = self.coverImageView.width;
+    } else {
+        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(cacheProgressUpdate:) name:AudioCacheProgressNotification object:nil];
+    }
 }
 
 - (IBAction)playAudio:(id)sender {
     NSLog(@"currentTag:%d", self.tag);
-    if ([[AudioManager defaultManager] currentIndex]==self.tag) {
+    if ([List currentIndex]==self.path) {
         [[AudioManager defaultManager] resume];
     } else {
-        [[AudioManager defaultManager] playIndex:self.tag];
+        [self playUI];
+        [List playIndex:self.path];
     }
     [self addPlayingView];
 }
 
 - (void)audioProgress:(NSNotification *)notifi{
     float prog = [[notifi object] floatValue];
+    if (prog==1) {
+        [self removePlayingView];
+    }
     self.progress.width = self.coverImageView.width*prog;
+    float volume = [[NSString stringWithFormat:@"%.1f", [[notifi.userInfo valueForKey:@"power"] floatValue]] floatValue];
+    volume = volume*10*0.076;
+    NSLog(@"%f", volume);
+    self.powerView.boundsWidth = self.voiceView.width*(volume);
+    self.time.text = [NSString stringWithFormat:@"%.0f''", [[AudioManager defaultManager] leftTime]];
+}
+
+- (void)cacheProgressUpdate:(NSNotification *)notifi{
+    NSDictionary *dict = notifi.userInfo;
+    NSString *audioURL = [dict valueForKey:@"url"];
+    if ([[List urlWithIndex:self.path] isEqualToString:audioURL]) {
+        float prog = [[dict valueForKey:@"progress"] floatValue];
+        self.cacheProgress.width = self.coverImageView.width*prog;
+    }
+    if (self.cacheProgress.width==self.coverImageView.width) {
+        [[NSNotificationCenter defaultCenter] removeObserver:self name:AudioCacheProgressNotification object:nil];
+    }
 }
 
 - (void)addPlayingView{
-    if (playView==nil) {
-        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(audioProgress:) name:AudioProgressNotification object:nil];
-        playView = [[PlayingView alloc] initWithFrame:CGRectMake(163, 313, 65, 26)];
-        [self addSubview:playView];
-        self.playBtn.alpha = 0;
-        self.playLabel.alpha = 0;
-        self.playCount.alpha = 0;
-        self.pauseBtn.userInteractionEnabled = YES;
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(audioProgress:) name:AudioProgressNotification object:nil];
+    if (self.voiceView.alpha) {
+        return;
     }
+    self.voiceView.alpha = 1;
+    self.playBtn.alpha = 0;
+    self.playLabel.alpha = 0;
+    self.playCount.alpha = 0;
+    self.pauseBtn.userInteractionEnabled = YES;
 }
 
 - (void)removePlayingView{
-    if (playView) {
-        [[NSNotificationCenter defaultCenter] removeObserver:self name:AudioProgressNotification object:nil];
-        [playView stop];
-        [playView removeFromSuperview];
-        playView = nil;
-        self.playBtn.alpha = 1;
-        self.playLabel.alpha = 1;
-        self.playCount.alpha = 1;
-        self.pauseBtn.userInteractionEnabled = NO;
-        [self audioProgress:0];
+    [[NSNotificationCenter defaultCenter] removeObserver:self name:AudioProgressNotification object:nil];
+    if (!self.voiceView.alpha) {
+        return;
     }
+    self.voiceView.alpha = 0;
+    self.playBtn.alpha = 1;
+    self.playLabel.alpha = 1;
+    self.playCount.alpha = 1;
+    self.pauseBtn.userInteractionEnabled = NO;
+    self.progress.width = self.coverImageView.width*0;
+    self.powerView.boundsWidth = 0;
 }
 
 - (void)sendAudio{
@@ -143,13 +185,13 @@
     UIGraphicsEndImageContext();
     
     WXMediaMessage *message = [WXMediaMessage message];
-    message.title = @"笑话";
+    message.title = @"这笑话还真有点意思";
     message.description = @"笑话";
     [message setThumbImage:image1];
     
     WXMusicObject *ext = [WXMusicObject object];
-    ext.musicUrl = [[AudioManager defaultManager] urlWithIndex:self.tag];
-    ext.musicDataUrl = [[AudioManager defaultManager] urlWithIndex:self.tag];
+    ext.musicUrl = [NSString stringWithFormat:@"yitingdaodi://%@", [List urlWithIndex:self.path]];
+    ext.musicDataUrl = [List urlWithIndex:self.path];
     message.mediaObject = ext;
     SendMessageToWXReq* req = [[SendMessageToWXReq alloc] init];
     req.bText = NO;

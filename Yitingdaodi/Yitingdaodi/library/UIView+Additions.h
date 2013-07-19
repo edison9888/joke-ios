@@ -20,6 +20,11 @@
 - (void)setWidth:(float)w;
 - (void)setHeight:(float)h;
 
+- (float)boundsHeight;
+- (float)boundsWidth;
+- (void)setBoundsWidth:(float)w;
+- (void)setBoundsHeight:(float)h;
+
 - (void)fadeIn;
 - (void)fadeOut;
 - (void)fadeInOnComplet:(void(^)(BOOL))complet;

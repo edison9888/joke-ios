@@ -18,5 +18,8 @@ typedef enum {
 
 + (void)warning:(NSString *)message withType:(MessageType)type;
 + (void)warning:(NSString *)message withType:(MessageType)type delay:(int)delay;
++ (void)warning:(UIImage *)image;
+
++ (void)wating:(NSString *)message;
 
 @end

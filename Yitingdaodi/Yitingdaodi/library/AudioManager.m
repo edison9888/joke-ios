@@ -7,16 +7,17 @@
 //
 
 #import "AudioManager.h"
-#import <AVFoundation/AVFoundation.h>
-
+#import "AFHTTPRequestOperation.h"
+#import "AFHTTPClient.h"
+#import "AppUtil.h"
 static AudioManager *sSharedInstance;
 
 @implementation AudioManager {
-    MPMoviePlayerController *player;
-    NSMutableArray *playList;
-    int currentIndex;
+    AVAudioPlayer *player;
     NSTimer *ticker;
     NSString *tempURL;
+    NSMutableData *currentData;
+    float tempProgress;
 }
 
 + (AudioManager *)defaultManager{
@@ -30,21 +31,16 @@ static AudioManager *sSharedInstance;
 - (id)init{
     self = [super init];
     if (self) {
-        currentIndex = -1;
         AVAudioSession *session = [AVAudioSession sharedInstance];
         [session setActive:YES error:nil];
         [session setCategory:AVAudioSessionCategoryPlayback error:nil];
-        player = [[MPMoviePlayerController alloc] init];
-        player.movieSourceType = MPMovieSourceTypeStreaming;
-        playList = [[NSMutableArray alloc] init];
-        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(audiofinished:) name:MPMoviePlayerPlaybackDidFinishReasonUserInfoKey object:nil];
     }
     return self;
 }
 
 - (void)startTick{
     [self stopTick];
-    ticker = [NSTimer scheduledTimerWithTimeInterval:.5 target:self selector:@selector(tick) userInfo:nil repeats:YES];
+    ticker = [NSTimer scheduledTimerWithTimeInterval:.3 target:self selector:@selector(tick) userInfo:nil repeats:YES];
     [[NSRunLoop currentRunLoop] addTimer:ticker forMode:NSRunLoopCommonModes];
     [[NSNotificationCenter defaultCenter] postNotificationName:AudioPlayNotification object:nil];
 }
@@ -58,23 +54,88 @@ static AudioManager *sSharedInstance;
 }
 
 - (float)progress{
-    float currentTime = player.currentPlaybackTime;
+    float currentTime = player.currentTime;
     float total = player.duration;
     return currentTime/total;
 }
 
 - (void)tick{
-    [[NSNotificationCenter defaultCenter] postNotificationName:AudioProgressNotification object:[NSNumber numberWithFloat:[self progress]]];
+    [player updateMeters];
+    float level = [player peakPowerForChannel:0];
+    double peakPowerForChannel = pow(10, (0.05 * level));
+//    NSLog(@"%f, %f", level, peakPowerForChannel);
+    [[NSNotificationCenter defaultCenter] postNotificationName:AudioProgressNotification object:[NSNumber numberWithFloat:[self progress]] userInfo:@{@"power": @(peakPowerForChannel)}];
+}
+
+- (NSString *)pathWithURL:(NSString *)url{
+    return [[url componentsSeparatedByString:@"/"] lastObject];
 }
 
 - (void)playWithURL:(NSString *)url{
+    if (url.length<=0) {
+        return;
+    }
+    [self stopTick];
     [[NSNotificationCenter defaultCenter] postNotificationName:AudioProgressNotification object:[NSNumber numberWithFloat:0]];
     AVAudioSession *session = [AVAudioSession sharedInstance];
     [session setActive:YES error:nil];
     [session setCategory:AVAudioSessionCategoryPlayback error:nil];
-    [player setContentURL:[NSURL URLWithString:url]];
-    [player play];
-    [self startTick];
+    
+    //stop player
+    if (player) {
+        player.delegate = nil;
+        [player stop];
+        player = nil;
+    }
+    if (currentData) {
+        currentData = nil;
+    }
+    tempProgress = -1;
+    NSString *path = [NSTemporaryDirectory() stringByAppendingPathComponent:[self pathWithURL:url]];
+    if ([[NSFileManager defaultManager] fileExistsAtPath:path]) {
+        NSLog(@"play local with path:%@", path);
+        if (player==nil) {
+            NSData *audio = [NSData dataWithContentsOfFile:path];
+            player = [[AVAudioPlayer alloc] initWithData:audio error:nil];
+            player.delegate = self;
+            player.meteringEnabled = YES;
+            [player play];
+            [self startTick];
+        }
+    } else {
+        //download
+        NSLog(@"play url:%@", url);
+        NSString *cachePath = [NSTemporaryDirectory() stringByAppendingPathComponent:[self pathWithURL:url]];
+        NSURLRequest *request = [NSURLRequest requestWithURL:[NSURL URLWithString:url]];
+        AFHTTPRequestOperation *operation1 = [[AFHTTPRequestOperation alloc] initWithRequest:request];
+        operation1.outputStream = [NSOutputStream outputStreamToFileAtPath:cachePath append:NO];
+        [operation1 setDownloadProgressBlock:^(NSUInteger bytesRead, long long totalBytesRead, long long totalBytesExpectedToRead, NSData *receiveData) {
+            float progress = (totalBytesRead*1.0)/(totalBytesExpectedToRead*1.0);
+                tempProgress = progress;
+                //            NSLog(@"url%@ progress:%f", url, progress);
+                [[NSNotificationCenter defaultCenter] postNotificationName:AudioCacheProgressNotification object:nil userInfo:@{@"url": url, @"progress":@(progress)}];
+                if (currentData==nil) {
+                    currentData = [[NSMutableData alloc] init];
+                }
+                [currentData appendData:receiveData];
+                if (player==nil && progress>.15) {
+                    player = [[AVAudioPlayer alloc] initWithData:currentData error:nil];
+                    player.delegate = self;
+                    player.meteringEnabled = YES;
+                    [player play];
+                    [self startTick];
+                }
+        }];
+        [operation1 setCompletionBlockWithSuccess:^(AFHTTPRequestOperation *operation, id responseObject) {
+            NSLog(@"download complet", nil);
+            [[NSFileManager defaultManager] moveItemAtPath:cachePath toPath:path error:nil];
+        } failure:^(AFHTTPRequestOperation *operation, NSError *error) {
+            NSLog(@"download failed", nil);
+            [[NSNotificationCenter defaultCenter] postNotificationName:AudioCacheProgressNotification object:@(0)];
+            [[NSFileManager defaultManager] removeItemAtPath:path error:nil];
+        }];
+        [operation1 start];
+    }
     tempURL = [url copy];
 }
 
@@ -82,40 +143,18 @@ static AudioManager *sSharedInstance;
     return !tempURL;
 }
 
-- (void)audiofinished:(NSNotification *)notification{
-    if (notification==nil) {
-        [[NSNotificationCenter defaultCenter] postNotificationName:AudioProgressNotification object:[NSNumber numberWithFloat:1]];
-        tempURL = nil;
-        [self stopTick];
-        if ([[[UserDataManager defaultUserData] valueForKey:@"autoPlay"] boolValue]) {
-            [self next];
-        }
-    }
-    int reason = [[[notification userInfo] valueForKey:MPMoviePlayerPlaybackDidFinishReasonUserInfoKey] intValue];
-    if (reason == MPMovieFinishReasonPlaybackEnded) {
-        [[NSNotificationCenter defaultCenter] postNotificationName:AudioProgressNotification object:[NSNumber numberWithFloat:1]];
-        tempURL = nil;
-        [self stopTick];
+#pragma mark - Audio delegate
+- (void)audioPlayerDidFinishPlaying:(AVAudioPlayer *)player successfully:(BOOL)flag{
+    [[NSNotificationCenter defaultCenter] postNotificationName:AudioProgressNotification object:[NSNumber numberWithFloat:1]];
+    tempURL = nil;
+    [self stopTick];
+    if ([[[UserDataManager defaultUserData] valueForKey:@"autoPlay"] boolValue]) {
         [self next];
     }
 }
 
-- (void)setMediaInfo:(UIImage *)img andTitle:(NSString *)title andArtist:(NSString *)artist{
-    if (NSClassFromString(@"MPNowPlayingInfoCenter")) {
-        NSMutableDictionary * dict = [[NSMutableDictionary alloc] init];
-        [dict setObject:title forKey:MPMediaItemPropertyAlbumTitle];
-        [dict setObject:artist forKey:MPMediaItemPropertyArtist];
-        [dict setObject:[NSNumber numberWithFloat:player.currentPlaybackTime] forKey:MPMediaItemPropertyPlaybackDuration];
-        
-        MPMediaItemArtwork * mArt = [[MPMediaItemArtwork alloc] initWithImage:img];
-        [dict setObject:mArt forKey:MPMediaItemPropertyArtwork];
-        [MPNowPlayingInfoCenter defaultCenter].nowPlayingInfo = nil;
-        [[MPNowPlayingInfoCenter defaultCenter] setNowPlayingInfo:dict];
-    }
-}
-
 - (BOOL)changeStat{
-    if (player.playbackState == MPMoviePlaybackStatePlaying) {
+    if (player.playing) {
         [player pause];
         [self stopTick];
         return NO;
@@ -126,88 +165,28 @@ static AudioManager *sSharedInstance;
     }
 }
 
-- (MPMoviePlaybackState)stat{
-    return player.playbackState;
-}
-
 - (void)resume{
-    if (ticker==nil) {
+    if (player && !player.playing) {
         [player play];
         [self startTick];
     }
 }
 
 - (void)pause{
-    if (player.playbackState == MPMoviePlaybackStatePlaying) {
+    if (player && player.playing) {
         [player pause];
         [self stopTick];
     }
 }
 
 - (void)next{
-    if (playList.count<=0) {
-        return;
-    }
-    ++currentIndex;
-    if (currentIndex>playList.count-1) {
-        currentIndex = 0;
-    }
-    NSLog(@"next play index:%d", currentIndex);
-    NSString *url = [playList objectAtIndex:currentIndex];
-    [self playWithURL:url];
-    
-    [[NSNotificationCenter defaultCenter] postNotificationName:AudioNextNotification object:nil];
+    [_delegate playNext];
+//    [[NSNotificationCenter defaultCenter] postNotificationName:AudioNextNotification object:nil];
 }
 
 - (void)pre{
-    if (playList.count<=0) {
-        return;
-    }
-    --currentIndex;
-    if (currentIndex<0) {
-        currentIndex = playList.count-1;
-    }
-    NSLog(@"pre play index:%d", currentIndex);
-    [self playWithURL:[playList objectAtIndex:currentIndex]];
-    
-    [[NSNotificationCenter defaultCenter] postNotificationName:AudioPreNotification object:nil];
-}
-
-- (void)addAudioToList:(NSString *)url{
-    [playList addObject:url];
-}
-
-- (void)addAudioListToList:(NSArray *)arr{
-    [playList addObjectsFromArray:arr];
-}
-
-- (void)insertAudioToList:(NSString *)name{
-    [playList insertObject:name atIndex:0];
-}
-
-- (void)insertAudioListToList:(NSArray *)arr{
-    for (int i=arr.count-1; i>=0; i--) {
-        NSString *name = [arr objectAtIndex:i];
-        [playList insertObject:name atIndex:0];
-    }
-}
-
-- (void)clearAudioList{
-    [player stop];
-    currentIndex = -1;
-    tempURL = nil;
-    [self stopTick];
-    [playList removeAllObjects];
-}
-
-- (void)skipTo:(float)percentage{
-    if (percentage >= 1) {
-        [self audiofinished:nil];
-        return;
-    }
-    float total = player.duration;
-    [[NSNotificationCenter defaultCenter] postNotificationName:AudioProgressNotification object:[NSNumber numberWithFloat:total*percentage]];
-    [player setCurrentPlaybackTime:total*percentage];
+    [_delegate playPre];
+//    [[NSNotificationCenter defaultCenter] postNotificationName:AudioPreNotification object:nil];
 }
 
 - (float)duration{
@@ -215,48 +194,15 @@ static AudioManager *sSharedInstance;
 }
 
 - (float)currentPlaybackTime{
-    return player.currentPlaybackTime;
-    
+    return player.currentTime;
 }
 
-- (BOOL)hasNext{
-    return currentIndex<playList.count;
-}
-
-- (BOOL)hasPre{
-    return currentIndex>0;
-}
-
-- (void)playListAtFirst{
-    currentIndex = 0;
-    if (playList.count>0) {
-        [self playWithURL:[playList objectAtIndex:currentIndex]];
-    }
-}
-
-- (int)currentIndex{
-    return currentIndex;
-}
-
-- (void)playIndex:(int)index{
-    currentIndex = index;
-    [self playWithURL:[playList objectAtIndex:currentIndex]];
-    [[NSNotificationCenter defaultCenter] postNotificationName:OtherCellPlayNotification object:@(currentIndex)];
+- (float)leftTime{
+    return player.duration-player.currentTime;
 }
 
 - (BOOL)playing{
-    return player.playbackState == MPMoviePlaybackStatePlaying;
-}
-
-- (NSString *)urlWithIndex:(int)index{
-    if (playList && index!=-1 && index<playList.count) {
-        return [playList objectAtIndex:index];
-    }
-    return nil;
-}
-
-- (NSString *)currentURL{
-    return [self urlWithIndex:currentIndex];
+    return player.playing;
 }
 
 @end

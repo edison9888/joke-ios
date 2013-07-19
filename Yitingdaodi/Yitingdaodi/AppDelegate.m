@@ -12,32 +12,80 @@
 #import "WXApi.h"
 #import "MobClick.h"
 
-@implementation AppDelegate
-
+@implementation AppDelegate {
+    UIImageView *welCome;
+}
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
 {
     [[UIApplication sharedApplication] beginReceivingRemoteControlEvents];
+    _queue = [[NSOperationQueue alloc] init];
+    _queue.maxConcurrentOperationCount = 1;
     self.window = [[UIWindow alloc] initWithFrame:[[UIScreen mainScreen] bounds]];
-    
-    ListViewController *list = [[ListViewController alloc] initWithStyle:UITableViewStyleGrouped];
-    _navigationController = [[NavigationController alloc] initWithRootViewController:list];
+    _list = [[ListViewController alloc] initWithStyle:UITableViewStyleGrouped];
+    _navigationController = [[NavigationController alloc] initWithRootViewController:_list];
     _navigationController.navigationBarHidden = YES;
-    self.window.backgroundColor = [UIColor colorWithFullRed:227 green:227 blue:227 alpha:1];
+    self.window.backgroundColor = [UIColor blackColor];//[UIColor colorWithFullRed:227 green:227 blue:227 alpha:1];
     self.window.rootViewController = _navigationController;
     [self.window makeKeyAndVisible];
+    
+    NSString *load = [NSString stringWithFormat:@"Default%@.png", [UIDevice isRetina]?([UIDevice isiPhone5]?@"-568h@2x":@"@2x"):@""];
+    welCome = [[UIImageView alloc] initWithImage:imageNamed(load)];
+    [_navigationController.view addSubview:welCome];
+    UIActivityIndicatorView *activity = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleWhite];
+    [activity startAnimating];
+    activity.center = CGPointMake(welCome.frame.size.width/2, welCome.frame.size.height-80);
+    [welCome addSubview:activity];
+
     [WXApi registerApp:@"wxb3b0db608a4925ee"];
     [MobClick startWithAppkey:@"51c02df056240b165f006d11"];
     return YES;
 }
 
+- (void)enterApp{
+    if (welCome && welCome.alpha==1) {
+        [UIView animateWithDuration:.5 animations:^{
+            welCome.transform = CGAffineTransformMakeScale(1.15, 1.15);
+            welCome.alpha = 0;
+        } completion:^(BOOL finished) {
+            [welCome removeFromSuperview];
+        }];
+    }
+}
+
+- (BOOL) canBecomeFirstResponder {
+    return YES;
+}
+
+- (void) remoteControlReceivedWithEvent: (UIEvent *) receivedEvent {
+    if (receivedEvent.type == UIEventTypeRemoteControl) {
+        switch (receivedEvent.subtype) {
+            case UIEventSubtypeRemoteControlTogglePlayPause:
+                [[AudioManager defaultManager] changeStat];
+                break;
+            case UIEventSubtypeRemoteControlNextTrack:
+                [[AudioManager defaultManager] next];
+                break;
+            case UIEventSubtypeRemoteControlPreviousTrack:
+                [[AudioManager defaultManager] pre];
+                break;
+            default:
+                break;
+        }
+    }
+}
+
 - (BOOL)application:(UIApplication *)application handleOpenURL:(NSURL *)url
 {
+    NSString *urlStr = [url absoluteString];
+    if ([urlStr indexOf:@"yitingdaodi://"]!=-1) {
+        return YES;
+    }
     return  [WXApi handleOpenURL:url delegate:self];
 }
 
 - (BOOL)application:(UIApplication *)application openURL:(NSURL *)url sourceApplication:(NSString *)sourceApplication annotation:(id)annotation
 {
-    return  [WXApi handleOpenURL:url delegate:self];
+    return [self application:application handleOpenURL:url];
 }
 
 - (void) onReq:(BaseReq*)req{
@@ -73,6 +121,7 @@
 
 - (void)applicationDidEnterBackground:(UIApplication *)application
 {
+    [_list backUp];
     // Use this method to release shared resources, save user data, invalidate timers, and store enough application state information to restore your application to its current state in case it is terminated later.
     // If your application supports background execution, this method is called instead of applicationWillTerminate: when the user quits.
 }

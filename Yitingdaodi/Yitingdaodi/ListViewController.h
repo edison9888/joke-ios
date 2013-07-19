@@ -8,6 +8,13 @@
 
 #import <UIKit/UIKit.h>
 
-@interface ListViewController : UITableViewController
+@interface ListViewController : UITableViewController <AudioManagerDelegate>
+
+- (void)backUp;
+- (NSIndexPath *)currentIndex;
+- (void)playIndex:(NSIndexPath *)indexPath;
+- (BOOL)hasCacheWithIndex:(NSIndexPath *)indexPath;
+- (NSString *)urlWithIndex:(NSIndexPath *)indexPath;
+- (void)cacheToLocal;
 
 @end

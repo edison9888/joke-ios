@@ -8,55 +8,25 @@
 
 #import <Foundation/Foundation.h>
 #import <MediaPlayer/MediaPlayer.h>
+#import <AVFoundation/AVFoundation.h>
+
 #define AudioPlayNotification @"audioPaly"
 #define AudioPauseNotification @"audioPause"
 #define AudioNextNotification @"audioNext"
 #define AudioPreNotification @"audioPre"
 #define AudioProgressNotification @"audioProgress"
+#define AudioCacheProgressNotification @"audioCacheProgress"
+#define AudioCacheAllProgressNotification @"audioCacheAllProgress"
 
+@interface AudioManager : NSObject <AVAudioPlayerDelegate>
 
-@interface AudioManager : NSObject
-
+@property (nonatomic, weak) id delegate;
 /**
  Description: 返回AudioManager的对象
  @return AudioManager唯一对象
  @author johnil
  */
 + (AudioManager *)defaultManager;
-
-/**
- Description: 添加音乐到播放列表
- @param 音乐URL
- @author johnil
- */
-- (void)addAudioToList:(NSString *)url;
-
-/**
- Description: 添加音乐URL数组到播放列表
- @param URL数组 @[@"url1", @"url2", ...]
- @author johnil
- */
-- (void)addAudioListToList:(NSArray *)arr;
-
-/**
- Description: 插入音乐到播放列表第一首
- @param 音乐URL
- @author johnil
- */
-- (void)insertAudioToList:(NSString *)name;
-
-/**
- Description: 插入音乐URL数组到播放列表表首
- @param URL数组 @[@"url1", @"url2", ...]
- @author johnil
- */
-- (void)insertAudioListToList:(NSArray *)arr;
-
-/**
- Description: 清除播放列表
- @author johnil
- */
-- (void)clearAudioList;
 
 /**
  Description: 当前播放列表是否为空
@@ -71,13 +41,6 @@
  @author johnil
  */
 - (BOOL)changeStat;
-
-/**
- Description: 当前音乐播放状态
- @return MPMoviePlaybackState 对应状态
- @author johnil
- */
-- (MPMoviePlaybackState)stat;
 
 /**
  Description: 在线播放URL
@@ -111,13 +74,6 @@
 - (void)pre;
 
 /**
- Description: 将当前播放的音乐跳到x%的位置,对应slider拖动时间条
- @param 时间百分比
- @author johnil
- */
-- (void)skipTo:(float)percentage;
-
-/**
  Description: 当前音乐的时间总长
  @return 时间总长
  @author johnil
@@ -131,39 +87,7 @@
  */
 - (float)currentPlaybackTime;
 
-/**
- Description: 音乐播放列表是否有下一首
- @return 是否
- @author johnil
- */
-- (BOOL)hasNext;
-
-/**
- Description: 音乐播放列表是否有上一首
- @return 是否
- @author johnil
- */
-- (BOOL)hasPre;
-
-/**
- Description: 从列表第一首开始播放音乐
- @author johnil
- */
-- (void)playListAtFirst;
-
-/**
- Description: 当前播放的音乐是播放列表的第几首
- @return 第x首
- @author johnil
- */
-- (int)currentIndex;
-
-/**
- Description: 播放当前播放列表的第index首
- @param 要播放的下标
- @author johnil
- */
-- (void)playIndex:(int)index;
+- (float)leftTime;
 
 /**
  Description: 是否在播放
@@ -179,16 +103,12 @@
  */
 - (float)progress;
 
-/**
- Description: 设置锁屏时音乐封面
- @param 封面图片
- @param 名称
- @param 歌手
- @author johnil
- */
-
-- (void)setMediaInfo:(UIImage *)img andTitle:(NSString *)title andArtist:(NSString *)artist;
-
-- (NSString *)currentURL;
-- (NSString *)urlWithIndex:(int)index;
 @end
+
+@protocol AudioManagerDelegate <NSObject>
+
+- (void)playNext;
+- (void)playPre;
+
+@end
+

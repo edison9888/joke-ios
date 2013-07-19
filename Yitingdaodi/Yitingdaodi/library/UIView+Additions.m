@@ -50,6 +50,26 @@
     self.frame = frame;
 }
 
+- (float)boundsWidth{
+    return self.bounds.size.width;
+}
+
+- (float)boundsHeight{
+    return self.bounds.size.height;
+}
+
+- (void)setBoundsWidth:(float)w{
+    CGRect frame = self.bounds;
+    frame.size.width = w;
+    self.bounds = frame;
+}
+
+- (void)setBoundsHeight:(float)h{
+    CGRect frame = self.bounds;
+    frame.size.height = h;
+    self.bounds = frame;
+}
+
 - (void)fadeIn{
     [self fadeInOnComplet:nil];
 }

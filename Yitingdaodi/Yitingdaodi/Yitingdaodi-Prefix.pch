@@ -21,9 +21,11 @@
 #import "AppUtil.h"
 #import "UserDataManager.h"
 #import "AppDelegate.h"
+#import "ListViewController.h"
 #endif
 
 #define ApplicationDelegate ((AppDelegate *)[UIApplication sharedApplication].delegate)//获取AppDelegate
+#define List ([(AppDelegate *)[UIApplication sharedApplication].delegate list])
 #define navi ([(AppDelegate *)[UIApplication sharedApplication].delegate navigationController])//获取AppDelegate
 #define naviBar ([(AppDelegate *)[UIApplication sharedApplication].delegate navigationController].bar)
 #define OtherCellPlayNotification @"OtherPlay"

@@ -14,5 +14,7 @@
 @property (strong, nonatomic) IBOutlet UIButton *playBtn;
 @property (strong, nonatomic) IBOutlet UILabel *time;
 @property (strong, nonatomic) IBOutlet UIImageView *warningImageView;
+@property (strong, nonatomic) IBOutlet UIView *voiceView;
+@property (strong, nonatomic) IBOutlet UIImageView *redView;
 
 @end
